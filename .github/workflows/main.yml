@@ -1,27 +1,50 @@
-name: Release on Tag
+name: Auto Tag & Release
 
 on:
   push:
-    tags:
-      - 'v*.*.*'
+    branches:
+      - main
+
+permissions:
+  contents: write
 
 jobs:
-  build:
+  tag-and-release:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up JDK
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Build with Gradle
-        run: ./gradlew clean build
+      - name: Set up Git identity
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
 
-      - name: Upload JAR to Release
-        uses: softprops/action-gh-release@v1
+      - name: Calculate new version
+        id: version
+        run: |
+          TAG_PREFIX="v1.0."
+          EXISTING_TAGS=$(git tag --list "${TAG_PREFIX}*" | sed "s/${TAG_PREFIX}//" | sort -nr)
+          NEXT_NUM=0
+          if [ -n "$EXISTING_TAGS" ]; then
+            NEXT_NUM=$(( $(echo "$EXISTING_TAGS" | head -n1) + 1 ))
+          fi
+          NEW_TAG="${TAG_PREFIX}${NEXT_NUM}"
+          echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+
+      - name: Create Git Tag and Push
+        run: |
+          git tag ${{ env.NEW_TAG }}
+          git push origin ${{ env.NEW_TAG }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          files: build/libs/*.jar
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ env.NEW_TAG }}
+          name: Release ${{ env.NEW_TAG }}
+          body: |
+            ✅ Auto-generated release from push to main
+          draft: false
+          prerelease: false
