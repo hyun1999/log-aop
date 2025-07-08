@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 @Aspect
 @Component
 public class LogApiAspect {
+
     private static final Logger logger = LoggerFactory.getLogger(LogApiAspect.class);
 
     @Around("@annotation(logApiResponse)")
